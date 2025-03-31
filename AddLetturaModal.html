@@ -1,0 +1,302 @@
+<!-- =========================================================== -->
+<!-- Contenuto del file AddLetturaModal.html                     -->
+<!-- =========================================================== -->
+
+<div class="modal fade" id="addModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Nuova Lettura Contatore</h5>
+        <button type="button" class="btn-close" onclick="closeAddModal()" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <!-- Tab per la scelta del metodo di inserimento -->
+        <ul class="nav nav-tabs mb-4" id="insertionTab" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="manual-tab" data-bs-toggle="tab" data-bs-target="#manual-content" type="button" role="tab" aria-controls="manual-content" aria-selected="true">
+              <i class="bi bi-pencil me-2"></i>Inserimento Manuale
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="scan-tab" data-bs-toggle="tab" data-bs-target="#scan-content" type="button" role="tab" aria-controls="scan-content" aria-selected="false">
+              <i class="bi bi-camera me-2"></i>Scansione Contatore
+            </button>
+          </li>
+        </ul>
+
+        <!-- Tab content -->
+        <div class="tab-content" id="insertionTabContent">
+
+          <!-- ============================ -->
+          <!-- Tab Content: Manuale         -->
+          <!-- ============================ -->
+          <div class="tab-pane fade show active" id="manual-content" role="tabpanel" aria-labelledby="manual-tab">
+            <!-- Tab per Tipo Contatore -->
+            <ul class="nav nav-pills nav-fill mb-4" id="tipoContatoreTab" role="tablist">
+              <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="acqua-tab" data-bs-toggle="pill" data-bs-target="#acqua-content" type="button" role="tab" aria-controls="acqua-content" aria-selected="true" data-tipo="acqua">
+                  <i class="bi bi-droplet-fill"></i> Acqua
+                </button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link" id="luce-tab" data-bs-toggle="pill" data-bs-target="#luce-content" type="button" role="tab" aria-controls="luce-content" aria-selected="false" data-tipo="luce">
+                  <i class="bi bi-lightning-fill"></i> Luce
+                </button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link" id="gas-tab" data-bs-toggle="pill" data-bs-target="#gas-content" type="button" role="tab" aria-controls="gas-content" aria-selected="false" data-tipo="gas">
+                  <i class="bi bi-fire"></i> Gas
+                </button>
+              </li>
+            </ul>
+
+            <!-- Tab content per tipo contatore -->
+            <div class="tab-content" id="tipoContatoreTabContent">
+              <!-- Tab Acqua -->
+              <div class="tab-pane fade show active" id="acqua-content" role="tabpanel" aria-labelledby="acqua-tab">
+                <form id="add-form-acqua" class="add-form" onsubmit="return false;">
+                  <input type="hidden" name="tipoContatore" value="acqua">
+                  <div class="row mb-3">
+                    <div class="col-md-6">
+                      <label for="add-condominio-acqua" class="form-label">Condominio*</label>
+                      <select class="form-select add-condominio" id="add-condominio-acqua" name="condominioId" required onchange="loadApartments(this)">
+                        <option value="">Seleziona Condominio</option>
+                      </select>
+                    </div>
+                    <div class="col-md-6">
+                      <label for="add-appartamento-acqua" class="form-label">Appartamento*</label>
+                      <select class="form-select add-appartamento" id="add-appartamento-acqua" name="appartamentoId" required onchange="loadLastReading(this)">
+                        <option value="">Seleziona Appartamento</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="row mb-3">
+                    <div class="col-md-6">
+                      <label for="add-data-acqua" class="form-label">Data Lettura*</label>
+                      <input type="date" class="form-control" id="add-data-acqua" name="data" required>
+                    </div>
+                    <div class="col-md-6">
+                      <label for="add-lettura-acqua" class="form-label">Valore Lettura (m³)*</label>
+                      <div class="input-group">
+                        <input type="number" class="form-control add-lettura" id="add-lettura-acqua" name="lettura" required step="0.001" min="0" inputmode="decimal">
+                        <span class="input-group-text">m³</span>
+                      </div>
+                    </div>
+                  </div>
+                  <!-- Display simulato contatore -->
+                  <div class="contatore-display acqua-display mb-3">
+                    <div class="contatore-numeri">
+                      <div class="numero-colonna"><div class="numero-wrapper"><div class="numero" id="acqua-digit-0">0</div></div></div>
+                      <div class="numero-colonna"><div class="numero-wrapper"><div class="numero" id="acqua-digit-1">0</div></div></div>
+                      <div class="numero-colonna"><div class="numero-wrapper"><div class="numero" id="acqua-digit-2">0</div></div></div>
+                      <div class="numero-colonna"><div class="numero-wrapper"><div class="numero" id="acqua-digit-3">0</div></div></div>
+                      <div class="numero-colonna"><div class="numero-wrapper"><div class="numero" id="acqua-digit-4">0</div></div></div>
+                      <div class="virgola">,</div>
+                      <div class="numero-colonna"><div class="numero-wrapper"><div class="numero numero-decimale" id="acqua-digit-5">0</div></div></div>
+                      <div class="numero-colonna"><div class="numero-wrapper"><div class="numero numero-decimale" id="acqua-digit-6">0</div></div></div>
+                      <div class="numero-colonna"><div class="numero-wrapper"><div class="numero numero-decimale" id="acqua-digit-7">0</div></div></div>
+                    </div>
+                    <div class="ultimo-valore text-center" id="last-reading-acqua">Ultima lettura: --</div>
+                  </div>
+                  <div class="mb-3 mt-3">
+                    <label for="add-note-acqua" class="form-label">Note</label>
+                    <textarea class="form-control" id="add-note-acqua" name="note" rows="2"></textarea>
+                  </div>
+                </form>
+              </div>
+
+              <!-- Tab Luce -->
+              <div class="tab-pane fade" id="luce-content" role="tabpanel" aria-labelledby="luce-tab">
+                <form id="add-form-luce" class="add-form" onsubmit="return false;">
+                  <input type="hidden" name="tipoContatore" value="luce">
+                  <div class="row mb-3">
+                    <div class="col-md-6">
+                      <label for="add-condominio-luce" class="form-label">Condominio*</label>
+                      <select class="form-select add-condominio" id="add-condominio-luce" name="condominioId" required onchange="loadApartments(this)">
+                        <option value="">Seleziona Condominio</option>
+                      </select>
+                    </div>
+                    <div class="col-md-6">
+                      <label for="add-appartamento-luce" class="form-label">Appartamento*</label>
+                      <select class="form-select add-appartamento" id="add-appartamento-luce" name="appartamentoId" required onchange="loadLastReading(this)">
+                        <option value="">Seleziona Appartamento</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="row mb-3">
+                    <div class="col-md-6">
+                      <label for="add-data-luce" class="form-label">Data Lettura*</label>
+                      <input type="date" class="form-control" id="add-data-luce" name="data" required>
+                    </div>
+                    <div class="col-md-6">
+                      <label for="add-lettura-luce" class="form-label">Valore Lettura (kWh)*</label>
+                      <div class="input-group">
+                        <input type="number" class="form-control add-lettura" id="add-lettura-luce" name="lettura" required step="0.01" min="0" inputmode="decimal">
+                        <span class="input-group-text">kWh</span>
+                      </div>
+                    </div>
+                  </div>
+                  <!-- Display simulato contatore -->
+                  <div class="contatore-display luce-display mb-3">
+                    <div class="contatore-numeri">
+                      <div class="numero-colonna"><div class="numero-wrapper"><div class="numero" id="luce-digit-0">0</div></div></div>
+                      <div class="numero-colonna"><div class="numero-wrapper"><div class="numero" id="luce-digit-1">0</div></div></div>
+                      <div class="numero-colonna"><div class="numero-wrapper"><div class="numero" id="luce-digit-2">0</div></div></div>
+                      <div class="numero-colonna"><div class="numero-wrapper"><div class="numero" id="luce-digit-3">0</div></div></div>
+                      <div class="numero-colonna"><div class="numero-wrapper"><div class="numero" id="luce-digit-4">0</div></div></div>
+                      <div class="virgola">,</div>
+                      <div class="numero-colonna"><div class="numero-wrapper"><div class="numero numero-decimale" id="luce-digit-5">0</div></div></div>
+                      <div class="numero-colonna"><div class="numero-wrapper"><div class="numero numero-decimale" id="luce-digit-6">0</div></div></div>
+                    </div>
+                    <div class="ultimo-valore text-center" id="last-reading-luce">Ultima lettura: --</div>
+                  </div>
+                  <div class="mb-3 mt-3">
+                    <label for="add-note-luce" class="form-label">Note</label>
+                    <textarea class="form-control" id="add-note-luce" name="note" rows="2"></textarea>
+                  </div>
+                </form>
+              </div>
+
+              <!-- Tab Gas -->
+              <div class="tab-pane fade" id="gas-content" role="tabpanel" aria-labelledby="gas-tab">
+                <form id="add-form-gas" class="add-form" onsubmit="return false;">
+                  <input type="hidden" name="tipoContatore" value="gas">
+                  <div class="row mb-3">
+                    <div class="col-md-6">
+                      <label for="add-condominio-gas" class="form-label">Condominio*</label>
+                      <select class="form-select add-condominio" id="add-condominio-gas" name="condominioId" required onchange="loadApartments(this)">
+                        <option value="">Seleziona Condominio</option>
+                      </select>
+                    </div>
+                    <div class="col-md-6">
+                      <label for="add-appartamento-gas" class="form-label">Appartamento*</label>
+                      <select class="form-select add-appartamento" id="add-appartamento-gas" name="appartamentoId" required onchange="loadLastReading(this)">
+                        <option value="">Seleziona Appartamento</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="row mb-3">
+                    <div class="col-md-6">
+                      <label for="add-data-gas" class="form-label">Data Lettura*</label>
+                      <input type="date" class="form-control" id="add-data-gas" name="data" required>
+                    </div>
+                    <div class="col-md-6">
+                      <label for="add-lettura-gas" class="form-label">Valore Lettura (m³)*</label>
+                      <div class="input-group">
+                        <input type="number" class="form-control add-lettura" id="add-lettura-gas" name="lettura" required step="0.001" min="0" inputmode="decimal">
+                        <span class="input-group-text">m³</span>
+                      </div>
+                    </div>
+                  </div>
+                  <!-- Display simulato contatore -->
+                  <div class="contatore-display gas-display mb-3">
+                    <div class="contatore-numeri">
+                      <div class="numero-colonna"><div class="numero-wrapper"><div class="numero" id="gas-digit-0">0</div></div></div>
+                      <div class="numero-colonna"><div class="numero-wrapper"><div class="numero" id="gas-digit-1">0</div></div></div>
+                      <div class="numero-colonna"><div class="numero-wrapper"><div class="numero" id="gas-digit-2">0</div></div></div>
+                      <div class="numero-colonna"><div class="numero-wrapper"><div class="numero" id="gas-digit-3">0</div></div></div>
+                      <div class="numero-colonna"><div class="numero-wrapper"><div class="numero" id="gas-digit-4">0</div></div></div>
+                      <div class="virgola">,</div>
+                      <div class="numero-colonna"><div class="numero-wrapper"><div class="numero numero-decimale" id="gas-digit-5">0</div></div></div>
+                      <div class="numero-colonna"><div class="numero-wrapper"><div class="numero numero-decimale" id="gas-digit-6">0</div></div></div>
+                      <div class="numero-colonna"><div class="numero-wrapper"><div class="numero numero-decimale" id="gas-digit-7">0</div></div></div>
+                    </div>
+                    <div class="ultimo-valore text-center" id="last-reading-gas">Ultima lettura: --</div>
+                  </div>
+                  <div class="mb-3 mt-3">
+                    <label for="add-note-gas" class="form-label">Note</label>
+                    <textarea class="form-control" id="add-note-gas" name="note" rows="2"></textarea>
+                  </div>
+                </form>
+              </div>
+            </div> <!-- Fine tipoContatoreTabContent -->
+          </div> <!-- Fine manual-content -->
+
+          <!-- ============================ -->
+          <!-- Tab Content: Scanner         -->
+          <!-- ============================ -->
+          <div class="tab-pane fade" id="scan-content" role="tabpanel" aria-labelledby="scan-tab">
+            <div class="row mb-4">
+              <div class="col-md-6">
+                <label for="scan-condominio" class="form-label">Condominio*</label>
+                <select class="form-select" id="scan-condominio" required onchange="loadApartmentsForScan(this)">
+                  <option value="">Seleziona Condominio</option>
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label for="scan-appartamento" class="form-label">Appartamento*</label>
+                <select class="form-select" id="scan-appartamento" required>
+                  <option value="">Seleziona Appartamento</option>
+                </select>
+              </div>
+            </div>
+            <div class="row mb-4">
+              <div class="col-md-6">
+                <label for="scan-tipo" class="form-label">Tipo Contatore*</label>
+                <select class="form-select" id="scan-tipo" required>
+                  <option value="">Seleziona Tipo</option>
+                  <option value="acqua">Acqua</option>
+                  <option value="luce">Luce</option>
+                  <option value="gas">Gas</option>
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label for="scan-data" class="form-label">Data Lettura*</label>
+                <input type="date" class="form-control" id="scan-data" required>
+              </div>
+            </div>
+            
+            <div class="alert alert-info small">
+              <i class="bi bi-info-circle me-1"></i>Posiziona il contatore nell'area di scansione.
+            </div>
+            
+            <div id="scanner-container" class="mb-3 text-center position-relative d-none" style="max-width: 500px; margin: auto; border: 1px solid #ccc; background: #eee;">
+              <video id="video-preview" autoplay playsinline style="width: 100%; height: auto; display: block;"></video>
+              <canvas id="canvas" style="display: none;"></canvas>
+              <button id="capture-btn" class="btn btn-primary rounded-circle position-absolute bottom-0 start-50 translate-middle-x mb-2">
+                <i class="bi bi-camera-fill fs-4"></i>
+              </button>
+            </div>
+            
+            <div id="scan-result-container" class="d-none alert alert-success">
+              <h6>Scansione Completata</h6>
+              <p>Lettura rilevata: <strong id="scan-result-value">0.000</strong></p>
+              <div class="form-check mt-2">
+                <input class="form-check-input" type="checkbox" id="scan-confirm-checkbox">
+                <label class="form-check-label" for="scan-confirm-checkbox">Conferma lettura</label>
+              </div>
+              <button class="btn btn-sm btn-secondary mt-2" onclick="resetScanner()">
+                <i class="bi bi-arrow-repeat me-1"></i>Nuova Scansione
+              </button>
+            </div>
+            
+            <div id="scan-processing" class="text-center d-none my-4">
+              <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+              </div>
+              <p class="mt-2">Riconoscimento numeri...</p>
+            </div>
+            
+            <div id="scan-controls" class="text-center mt-3">
+              <button id="start-scan-btn" class="btn btn-success" onclick="startScanner()">
+                <i class="bi bi-camera-video me-2"></i>Avvia Fotocamera
+              </button>
+            </div>
+            
+            <div class="mb-3 mt-4">
+              <label for="scan-note" class="form-label">Note</label>
+              <textarea class="form-control" id="scan-note" rows="2"></textarea>
+            </div>
+          </div> <!-- Fine scan-content -->
+
+        </div> <!-- Fine insertionTabContent -->
+      </div> <!-- Fine modal-body -->
+      
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeAddModal()">Annulla</button>
+        <button type="button" class="btn btn-primary" id="save-manual-btn" onclick="saveManualReading()">Salva Lettura</button>
+        <button type="button" class="btn btn-primary d-none" id="save-scan-btn" onclick="saveScanReading()">Salva Lettura</button>
+      </div>
+    </div> <!-- Fine modal-content -->
+  </div> <!-- Fine modal-dialog -->
+</div> <!-- Fine div#addModal -->
