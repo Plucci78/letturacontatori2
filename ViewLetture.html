@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- CSS Libraries -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+  <!-- Tesseract (se usi OCR) -->
+  <script src="https://unpkg.com/tesseract.js@v2.1.0/dist/tesseract.min.js" defer></script>
+  <style>
+    /* Mantieni i tuoi stili CSS qui */
+    body { font-family: sans-serif; padding: 1em; }
+    .container { max-width: 1400px; margin: auto; }
+    .filter-section { background-color: #f8f9fa; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem; }
+    .table th { background-color: #e9ecef; }
+    .empty-message { text-align: center; padding: 2rem; color: #6c757d; border: 1px dashed #ccc; border-radius: 0.5rem; }
+    .badge-tipo { padding: 0.3em 0.6em; border-radius: 0.25rem; color: white; font-size: 0.85em; }
+    .badge-acqua { background-color: #0d6efd; }
+    .badge-luce { background-color: #ffc107; color: #000; }
+    .badge-gas { background-color: #dc3545; }
+
+    /* Stile per messaggi di stato/errore ? */
+    #status-message {
+      padding: 15px;
+      margin-bottom: 20px;
+      border-radius: 5px;
+      text-align: center;
+      font-weight: bold;
+      display: none; /* Nascosto di default */
+    }
+    .status-loading {
+      background-color: #eef;
+      border: 1px solid #aac;
+      color: #33a;
+    }
+    .status-error {
+      background-color: #fdd;
+      border: 1px solid #fbb;
+      color: #d00;
+    }
+    .status-success { /* Aggiunto per feedback positivo */
+       background-color: #dfd;
+       border: 1px solid #aca;
+       color: #080;
+    }
+
+     /* Stili per Modali e Contatori Simulati (mantieni i tuoi) */
+    .modal { /* ... */ }
+    .modal.show { /* ... */ }
+    /* ... altri stili ... */
+    .contatore-display { /* ... */ }
+    /* ... */
+    .ultimo-valore { /* Assicurati che questo selettore CSS esista se lo usi */
+        font-size: 0.9em;
+        color: #6c757d;
+        margin-top: 5px;
+    }
+
+  </style>
+</head>
+<body>
+ <!-- Nel file ViewLetture.html -->
+ <script>
+   // ... altre funzioni ...
+function onInitialDataSuccess(response) {
+// ---> AGGIUNTA: Log dettagliato e controllo null/undefined <---
+console.log("onInitialDataSuccess: Eseguita. Tipo di 'response':", typeof response, "Valore:", response);
+
+// ---> AGGIUNTA: Controllo robusto all'inizio <---
+ if (!response || typeof response !== 'object') {
+     const errorMsg = "Errore: Risposta non valida o nulla ricevuta dal server.";
+     console.error(errorMsg, response);
+     showStatusMessage(errorMsg, 'error');
+     displayLetture([]); // Mostra tabella vuota
+     return; // Interrompi l'esecuzione della funzione
+ }
+ // Se arriva qui, 'response' è un oggetto (anche se potrebbe essere un oggetto di errore)
+
+ hideStatusMessage(); // Nascondi messaggio di caricamento
+
+ // Ora procedi con il controllo standard su response.success
+ if (response.success) { // Verifica la proprietà success dell'oggetto response
+   allLetture = response.letture || [];
+
+   apartmentsMap = {};
+   (response.apartments || []).forEach(apt => { if (apt && apt.id) apartmentsMap[apt.id] = apt; });
+   console.log(`Mappa Appartamenti creata: ${Object.keys(apartmentsMap).length} voci.`);
+
+   condominiumsMap = {};
+   (response.condominiums || []).forEach(condo => { if (condo && condo.id) condominiumsMap[condo.id] = condo; });
+   console.log(`Mappa Condomini creata: ${Object.keys(condominiumsMap).length} voci.`);
+
+   populateCondominiumSelects(response.condominiums || []);
+   displayLetture(allLetture); // Mostra le letture
+   console.log("Dati caricati e visualizzati correttamente.");
+
+ } else {
+   // Errore logico restituito dal backend (response.success è false)
+   // La proprietà response.error DOVREBBE esistere qui grazie alla logica backend
+   const errorMsg = "Errore nel caricamento dati: " + (response.error || "Errore sconosciuto restituito dal server.");
+   console.error(errorMsg, response);
+   showStatusMessage(errorMsg, 'error');
+   displayLetture([]); // Mostra tabella vuota
+ }
+
+}
+
+// ... resto del tuo codice JavaScript ...
+</script>
+
+  <div class="container">
+    <!-- Messaggio di Stato Globale -->
+    <div id="status-message"></div>
+<!-- Header con titolo e pulsante -->
+<div class="header-section mb-4">
+  <div class="d-flex justify-content-between align-items-center pb-3 border-bottom">
+    <div>
+      <h2>Gestione Letture</h2>
+      <p class="text-muted mb-0">Visualizza, aggiungi e filtra le letture dei contatori.</p>
+    </div>
+    <div>
+      <button type="button" class="btn btn-primary" onclick="openAddModal()">
+        <i class="bi bi-plus-circle me-2"></i>Nuova Lettura
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Filtri -->
+<div class="filter-section">
+  <div class="row g-3 align-items-end">
+    <div class="col-md-4">
+      <label for="filter-condominio" class="form-label">Condominio</label>
+      <select class="form-select" id="filter-condominio" onchange="filterLetture()">
+        <option value="">Tutti i Condomini</option>
+        <!-- Opzioni popolate da JS -->
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label for="filter-contatore" class="form-label">Tipo Contatore</label>
+      <select class="form-select" id="filter-contatore" onchange="filterLetture()">
+        <option value="">Tutti i Tipi</option>
+        <option value="acqua">Acqua</option>
+        <option value="luce">Luce</option>
+        <option value="gas">Gas</option>
+      </select>
+    </div>
+    <div class="col-md-5">
+       <label for="searchInput" class="form-label">Cerca</label>
+      <div class="input-group">
+        <span class="input-group-text"><i class="bi bi-search"></i></span>
+        <input type="text" class="form-control" id="searchInput" placeholder="Cerca per condominio, appartamento, data, valore..." oninput="filterLetture()">
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Tabella letture -->
+<div class="table-responsive">
+  <table class="table table-hover align-middle" id="lettureTable">
+    <thead>
+      <tr>
+        <th scope="col">Data</th>
+        <th scope="col">Condominio</th>
+        <th scope="col">Appartamento</th>
+        <th scope="col">Tipo</th>
+        <th scope="col">Lettura</th>
+        <th scope="col">Consumo</th>
+        <th scope="col">Note</th>
+        <th scope="col">Azioni</th>
+      </tr>
+    </thead>
+    <tbody id="lettureList">
+      <!-- Righe popolate dinamicamente da JS -->
+    </tbody>
+  </table>
+
+  <!-- Messaggio quando non ci sono letture -->
+  <div id="emptyMessage" class="empty-message" style="display: none;">
+    <i class="bi bi-journal-x" style="font-size: 48px;"></i>
+    <h5 class="mt-3">Nessuna lettura trovata</h5>
+    <p>Aggiungi una nuova lettura o modifica i filtri applicati.</p>
+  </div>
+</div>
+
+  </div>
+<?!= include('AddLetturaModal'); ?>
+<?!= include('ViewLetturaModal'); ?>
+  <!-- Pulsanti di Debug (Opzionali, mantieni i tuoi se utili) -->
+  <div style="position: fixed; bottom: 10px; right: 10px; z-index: 9999; display: flex; flex-direction: column; gap: 5px;">
+      <button onclick="loadInitialData()" class="btn btn-sm btn-warning">Ricarica Dati</button>
+      <button onclick="testDebug()" class="btn btn-sm btn-secondary">Test Debug Backend</button>
+  </div>
+  <!-- === SCRIPTING === -->
+  <!-- Bootstrap Bundle JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- Il tuo codice JavaScript Applicativo -->
+  <script>
+    // === Variabili Globali ===
+    let allLetture = [];        // Array con tutte le letture caricate
+    let condominiumsMap = {};   // Oggetto: { condoId: condoObject }
+    let apartmentsMap = {};     // Oggetto: { aptId: aptObject }
+    let addModalInstance = null; // Istanza Bootstrap Modal per aggiunta
+    let viewModalInstance = null;// Istanza Bootstrap Modal per visualizzazione
+    let activeTabForm = 'acqua'; // Tiene traccia del tab attivo nel form (acqua/luce/gas)
+
+    // === Funzioni Helper UI ===
+    function showStatusMessage(message, type = 'loading') { // types: loading, error, success
+      const msgDiv = document.getElementById('status-message');
+      const emptyMsgDiv = document.getElementById('emptyMessage');
+      const tableBody = document.getElementById('lettureList');
+
+      if (!msgDiv) return;
+
+      msgDiv.textContent = message;
+      msgDiv.className = `status-${type}`; // Applica classe CSS
+      msgDiv.style.display = 'block';
+
+      // Nascondi altri elementi durante caricamento/errore
+      if (type === 'loading' || type === 'error') {
+         if (emptyMsgDiv) emptyMsgDiv.style.display = 'none';
+         if (tableBody) tableBody.innerHTML = ''; // Pulisci tabella
+      }
+    }
+
+    function hideStatusMessage() {
+       const msgDiv = document.getElementById('status-message');
+       if (msgDiv) msgDiv.style.display = 'none';
+    }
+
+    function showTemporarySuccess(message) {
+        showStatusMessage(message, 'success');
+        setTimeout(hideStatusMessage, 3000); // Nascondi dopo 3 secondi
+    }
+
+
+    // === Inizializzazione ===
+    document.addEventListener('DOMContentLoaded', function() {
+      console.log("DOM Caricato. Inizializzazione applicazione...");
+
+      // Inizializza istanze Modali Bootstrap (se usi Bootstrap 5)
+      const addModalEl = document.getElementById('addModal');
+      if (addModalEl && typeof bootstrap !== 'undefined') {
+         try { // Aggiunto try-catch per sicurezza
+             addModalInstance = new bootstrap.Modal(addModalEl);
+             console.log("Istanza Modal Aggiunta creata.");
+         } catch (e) {
+             console.error("Errore creazione istanza Modal Aggiunta:", e);
+         }
+      } else {
+          console.warn("Elemento #addModal non trovato o Bootstrap non definito.");
+      }
+
+      const viewModalEl = document.getElementById('viewModal');
+      if (viewModalEl && typeof bootstrap !== 'undefined') {
+         try {
+             viewModalInstance = new bootstrap.Modal(viewModalEl);
+             console.log("Istanza Modal Visualizza creata.");
+         } catch (e) {
+             console.error("Errore creazione istanza Modal Visualizza:", e);
+         }
+      } else {
+          console.warn("Elemento #viewModal non trovato o Bootstrap non definito.");
+      }
+
+      // Carica dati iniziali
+      loadInitialData();
+
+      // Imposta data odierna nei campi data (Mantieni/Adatta la tua logica)
+      setTodaysDate();
+
+      // Setup listener per cambio tab nel form aggiunta (Mantieni/Adatta)
+      setupAddFormTabs();
+
+       // Setup listener input numerici per display simulato (Mantieni/Adatta)
+       setupSimulatedDisplayListeners();
+
+       // Altri setup iniziali se necessari...
+       console.log("Inizializzazione completata.");
+    });
+
+    function setTodaysDate() {
+       const today = new Date().toISOString().split('T')[0];
+       document.querySelectorAll('input[type="date"]').forEach(input => {
+         if (input && !input.value) { // Imposta solo se vuoto
+             input.value = today;
+         }
+       });
+    }
+
+    function setupAddFormTabs() {
+        // Esempio: listener per i tab acqua/luce/gas nel modal di aggiunta
+        document.querySelectorAll('#tipoContatoreTab .nav-link').forEach(tab => {
+            tab.addEventListener('shown.bs.tab', event => {
+                activeTabForm = event.target.getAttribute('data-tipo');
+                console.log("Tab form attivo cambiato a:", activeTabForm);
+            });
+        });
+        // Aggiungi listener anche per i tab Manuale/Scan se necessario
+        document.querySelectorAll('#insertionTab .nav-link').forEach(tab => {
+             tab.addEventListener('shown.bs.tab', event => {
+                const isManual = event.target.id === 'manual-tab';
+                const saveManualBtn = document.getElementById('save-manual-btn');
+                const saveScanBtn = document.getElementById('save-scan-btn');
+
+                if(saveManualBtn) saveManualBtn.classList.toggle('d-none', !isManual);
+                if(saveScanBtn) saveScanBtn.classList.toggle('d-none', isManual);
+
+                console.log("Tab inserimento cambiato a:", isManual ? 'Manuale' : 'Scansione');
+                if (!isManual) {
+                   // resetScanner(); // Esempio
+                } else {
+                   // stopScanner(); // Esempio
+                }
+             });
+        });
+    }
+
+     function setupSimulatedDisplayListeners() {
+         document.querySelectorAll('.add-lettura').forEach(input => {
+            input.addEventListener('input', function() {
+               const form = this.closest('.add-form');
+               if (!form) return;
+               const tipoInput = form.querySelector('input[name="tipoContatore"]');
+               if (!tipoInput) return;
+               const tipo = tipoInput.value; // Legge il tipo dal campo hidden
+               // Verifica che la funzione esista prima di chiamarla
+               if (typeof updateSimulatedDisplay === 'function') {
+                    updateSimulatedDisplay(tipo, this.value);
+               } else {
+                   console.warn("Funzione updateSimulatedDisplay non definita.");
+               }
+            });
+         });
+     }
+
+
+    // === Caricamento Dati dal Backend ===
+    function loadInitialData() {
+      console.log("loadInitialData: Chiamata a google.script.run.getInitialData()...");
+      showStatusMessage("Caricamento dati in corso...", 'loading');
+
+      google.script.run
+        .withSuccessHandler(onInitialDataSuccess)
+        .withFailureHandler(onInitialDataFailure)
+        .getInitialData(); // Chiama la funzione unificata nel backend
+    }
+
+    function onInitialDataSuccess(response) {
+      console.log("onInitialDataSuccess: Dati ricevuti.", response);
+      hideStatusMessage();
+
+      if (response && response.success) {
+        allLetture = response.letture || [];
+
+        apartmentsMap = {};
+        (response.apartments || []).forEach(apt => { if (apt && apt.id) apartmentsMap[apt.id] = apt; });
+        console.log(`Mappa Appartamenti creata: ${Object.keys(apartmentsMap).length} voci.`);
+
+        condominiumsMap = {};
+        (response.condominiums || []).forEach(condo => { if (condo && condo.id) condominiumsMap[condo.id] = condo; });
+        console.log(`Mappa Condomini creata: ${Object.keys(condominiumsMap).length} voci.`);
+
+        populateCondominiumSelects(response.condominiums || []);
+        displayLetture(allLetture);
+        console.log("Dati caricati e visualizzati correttamente.");
+
+      } else {
+        const errorMsg = "Errore nel caricamento dati: " + (response.error || "Errore sconosciuto dal server.");
+        console.error(errorMsg, response);
+        showStatusMessage(errorMsg, 'error');
+        displayLetture([]);
+      }
+    }
+
+    function onInitialDataFailure(error) {
+      const errorMsg = "Errore di comunicazione con il server: " + error.message;
+      console.error(errorMsg, error);
+      showStatusMessage(errorMsg, 'error');
+      displayLetture([]);
+    }
+
+
+    // === Popolamento Select ===
+    function populateCondominiumSelects(condominiums) {
+      const selects = document.querySelectorAll('#filter-condominio, .add-condominio, #scan-condominio');
+      console.log(`Popolamento ${selects.length} select condomini...`);
+
+      selects.forEach(select => {
+        if (!select) return;
+        const currentValue = select.value;
+        const firstOptionHTML = select.options.length > 0 ? `<option value="${select.options[0].value}">${select.options[0].text}</option>` : '<option value="">Seleziona...</option>';
+        select.innerHTML = firstOptionHTML;
+
+        condominiums.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        condominiums.forEach(condo => {
+          const option = document.createElement('option');
+          option.value = condo.id;
+          option.textContent = condo.name || `ID: ${condo.id}`;
+          select.appendChild(option);
+        });
+         if (currentValue && select.querySelector(`option[value="${currentValue}"]`)) {
+             select.value = currentValue;
+         }
+      });
+    }
+
+    function loadApartments(selectCondominioElement) {
+        const condominioId = selectCondominioElement.value;
+        const form = selectCondominioElement.closest('form, .tab-pane');
+        if (!form) return;
+        const selectAppartamento = form.querySelector('.add-appartamento, #scan-appartamento');
+
+        if (!selectAppartamento) {
+           console.error("Select appartamento non trovata per", selectCondominioElement.id);
+           return;
+        }
+
+        selectAppartamento.innerHTML = '<option value="">Caricamento...</option>';
+        selectAppartamento.disabled = true;
+
+        if (!condominioId) {
+             selectAppartamento.innerHTML = '<option value="">Seleziona Appartamento</option>';
+             selectAppartamento.disabled = false;
+             // ---> MODIFICA: Resetta anche qui il display ultima lettura <---
+             resetLastReadingDisplay(form); // Passa il form come contenitore
+             return;
+        }
+
+        console.log(`Caricamento appartamenti per condominio ID: ${condominioId}`);
+        const apartmentsOfCondo = Object.values(apartmentsMap)
+                                      .filter(apt => apt.condominiumId === condominioId)
+                                      .sort((a,b) => (a.number || '').localeCompare(b.number || ''));
+
+        selectAppartamento.innerHTML = '<option value="">Seleziona Appartamento</option>';
+        apartmentsOfCondo.forEach(apt => {
+            const option = document.createElement('option');
+            option.value = apt.id;
+            option.textContent = `${apt.number || '?'} - ${apt.owner || '(Proprietario sconosciuto)'}`;
+            selectAppartamento.appendChild(option);
+        });
+        selectAppartamento.disabled = false;
+        console.log(`Trovati ${apartmentsOfCondo.length} appartamenti.`);
+         // Resetta l'ultima lettura quando cambia l'appartamento/condominio
+         resetLastReadingDisplay(form); // Passa il form come contenitore
+    }
+
+    function loadLastReading(selectAppartamentoElement) {
+        const appartamentoId = selectAppartamentoElement.value;
+        const form = selectAppartamentoElement.closest('form, .tab-pane');
+        if (!form || !appartamentoId) {
+             resetLastReadingDisplay(form); // Passa il form
+             return;
+        }
+        const tipoInput = form.querySelector('input[name="tipoContatore"], #scan-tipo');
+        if (!tipoInput) {
+             console.error("Campo tipo contatore non trovato per", selectAppartamentoElement.id);
+             resetLastReadingDisplay(form); // Resetta comunque
+             return;
+        }
+        const tipoContatore = tipoInput.value.toLowerCase();
+        if (!tipoContatore) {
+            console.warn("Tipo contatore non selezionato o non trovato.");
+            resetLastReadingDisplay(form); // Resetta comunque
+            return;
+        }
+
+
+        console.log(`Caricamento ultima lettura per Apt ID: ${appartamentoId}, Tipo: ${tipoContatore}`);
+        // Trova il display specifico per il tipo DENTRO il form corrente
+        const displayElement = form.querySelector(`#last-reading-${tipoContatore}`);
+        if (displayElement) {
+            displayElement.textContent = 'Ultima lettura: Caricamento...';
+        } else {
+            console.warn(`Elemento display #last-reading-${tipoContatore} non trovato nel form.`);
+        }
+
+
+        google.script.run
+          .withSuccessHandler(function(lettura) {
+              if (displayElement) { // Verifica di nuovo se l'elemento esiste
+                  if (lettura && lettura.lettura !== undefined) {
+                     const formattedDate = lettura.data ? new Date(lettura.data).toLocaleDateString('it-IT') : 'N/D';
+                     const unit = { 'acqua': 'm³', 'luce': 'kWh', 'gas': 'm³' }[tipoContatore] || '';
+                     displayElement.textContent = `Ultima lettura: ${lettura.lettura.toFixed(3)} ${unit} (${formattedDate})`;
+                  } else {
+                     displayElement.textContent = 'Nessuna lettura precedente trovata';
+                  }
+              }
+          })
+          .withFailureHandler(function(error) {
+              console.error("Errore caricamento ultima lettura:", error);
+              if (displayElement) displayElement.textContent = 'Errore caricamento ultima lettura';
+          })
+          .getUltimaLettura(appartamentoId, tipoContatore);
+    }
+
+    // === NUOVA Funzione resetLastReadingDisplay (più robusta) ===
+    /**
+     * Resetta il testo di tutti gli elementi con classe '.ultimo-valore'
+     * all'interno di un dato elemento contenitore.
+     * @param {HTMLElement} containerElement L'elemento genitore (es. il modal o un form).
+     */
+    function resetLastReadingDisplay(containerElement) {
+        if (!containerElement || !(containerElement instanceof Element)) {
+            console.warn("resetLastReadingDisplay chiamato senza un elemento contenitore valido.");
+            // Tenta di trovare il modal di aggiunta come fallback se possibile
+            containerElement = document.getElementById('addModal');
+            if(!containerElement) return; // Esce se non trova neanche il modal
+        }
+        console.log("Resetting last reading display within:", containerElement.id || 'elemento senza id');
+
+        // Trova TUTTI gli elementi che mostrano l'ultima lettura dentro il contenitore
+        // Assicurati che i tuoi elementi abbiano la classe 'ultimo-valore'
+        const displayElements = containerElement.querySelectorAll('.ultimo-valore');
+
+        if(displayElements.length === 0) {
+            console.log("Nessun elemento .ultimo-valore trovato da resettare dentro", containerElement.id || 'elemento senza id');
+        } else {
+            console.log(`Trovati ${displayElements.length} elementi .ultimo-valore da resettare.`);
+        }
+
+        displayElements.forEach(el => {
+            if(el) { // Verifica extra
+               el.textContent = 'Ultima lettura: --';
+            }
+        });
+    }
+
+
+    // === Visualizzazione e Filtro Tabella ===
+    function displayLetture(lettureToDisplay) {
+      const tableBody = document.getElementById('lettureList');
+      const emptyMessageDiv = document.getElementById('emptyMessage');
+
+      if (!tableBody || !emptyMessageDiv) {
+        console.error("Elementi tabella #lettureList o #emptyMessage non trovati!");
+        return;
+      }
+
+      tableBody.innerHTML = '';
+
+      if (!lettureToDisplay || lettureToDisplay.length === 0) {
+        emptyMessageDiv.style.display = 'block';
+        tableBody.innerHTML = '';
+        return;
+      }
+
+      emptyMessageDiv.style.display = 'none';
+
+      const tipoClasses = { 'acqua': 'badge-acqua', 'luce': 'badge-luce', 'gas': 'badge-gas' };
+      const tipoLabels = { 'acqua': 'Acqua', 'luce': 'Luce', 'gas': 'Gas' };
+      const unitLabels = { 'acqua': 'm³', 'luce': 'kWh', 'gas': 'm³' };
+      const dateFormatter = new Intl.DateTimeFormat('it-IT');
+
+      lettureToDisplay.forEach(lettura => {
+         const condominio = condominiumsMap[lettura.condominioId] || { name: `ID: ${lettura.condominioId}` };
+         const appartamento = apartmentsMap[lettura.appartamentoId] || { number: `ID: ${lettura.appartamentoId}`, owner: '?' };
+         const dataLettura = lettura.data ? dateFormatter.format(new Date(lettura.data)) : 'N/D';
+         const tipo = lettura.tipoContatore || 'sconosciuto';
+         const letturaVal = (!isNaN(parseFloat(lettura.lettura))) ? parseFloat(lettura.lettura).toFixed(3) : 'N/A';
+         const consumoVal = (!isNaN(parseFloat(lettura.consumo))) ? parseFloat(lettura.consumo).toFixed(3) : 'N/A';
+         const unit = unitLabels[tipo] || '';
+         const tipoClass = tipoClasses[tipo] || '';
+         const tipoLabel = tipoLabels[tipo] || tipo;
+         const noteBreve = (lettura.note || '').substring(0, 30) + ((lettura.note || '').length > 30 ? '...' : '');
+
+         const row = tableBody.insertRow();
+         row.innerHTML = `
+            <td>${dataLettura}</td>
+            <td>${condominio.name || '(Mancante)'}</td>
+            <td>${appartamento.number || '?'} - ${appartamento.owner}</td>
+            <td><span class="badge-tipo ${tipoClass}">${tipoLabel}</span></td>
+            <td class="text-end">${letturaVal} ${unit}</td>
+            <td class="text-end">${consumoVal} ${unit}</td>
+            <td title="${lettura.note || ''}">${noteBreve}</td>
+            <td>
+              <button class="btn btn-sm btn-outline-primary" onclick="viewLettura('${lettura.id}')" title="Visualizza Dettagli">
+                <i class="bi bi-eye"></i>
+              </button>
+              <!-- Bottone elimina (commentato) -->
+            </td>
+          `;
+      });
+       console.log(`Tabella aggiornata con ${lettureToDisplay.length} letture.`);
+    }
+
+    function filterLetture() {
+      console.log("Filtraggio letture...");
+      if (!allLetture || !condominiumsMap || !apartmentsMap) {
+         console.warn("Dati non pronti per il filtraggio.");
+         return;
+      }
+
+      const condominioFilter = document.getElementById('filter-condominio')?.value || '';
+      const contatoreFilter = document.getElementById('filter-contatore')?.value || '';
+      const searchFilter = (document.getElementById('searchInput')?.value || '').toUpperCase().trim();
+
+      const filteredLetture = allLetture.filter(l => {
+         const condo = condominiumsMap[l.condominioId];
+         const apt = apartmentsMap[l.appartamentoId];
+         const dataLettura = l.data ? new Date(l.data) : null;
+
+         if (condominioFilter && l.condominioId !== condominioFilter) return false;
+         if (contatoreFilter && l.tipoContatore !== contatoreFilter) return false;
+         if (searchFilter) {
+            const searchTerms = searchFilter.split(' ').filter(term => term.length > 0);
+            let match = true;
+            for (const term of searchTerms) {
+                let termMatch = false;
+                if ((condo?.name || '').toUpperCase().includes(term)) termMatch = true;
+                else if ((apt?.number || '').toUpperCase().includes(term)) termMatch = true;
+                else if ((apt?.owner || '').toUpperCase().includes(term)) termMatch = true;
+                else if (dataLettura && dataLettura.toLocaleDateString('it-IT').includes(term)) termMatch = true;
+                else if (String(l.lettura).replace('.',',').includes(term)) termMatch = true;
+                else if (String(l.consumo).replace('.',',').includes(term)) termMatch = true;
+                else if ((l.note || '').toUpperCase().includes(term)) termMatch = true;
+
+                if (!termMatch) {
+                    match = false;
+                    break;
+                }
+            }
+            if (!match) return false;
+         }
+         return true;
+      });
+
+      console.log(`Filtrate ${filteredLetture.length} letture su ${allLetture.length}.`);
+      displayLetture(filteredLetture);
+    }
+
+
+    // === Gestione Modali (Apri/Chiudi) ===
+    // === MODIFICATA openAddModal ===
+    function openAddModal() {
+  console.log("Tentativo di apertura modal #addModal...");
+
+  // --- 1. Trova l'elemento HTML del Modal ---
+  const modalElement = document.getElementById('addModal');
+
+  // Verifica SUBITO se l'elemento HTML esiste nel DOM
+  if (!modalElement) {
+      // Questo è un errore grave, probabilmente l'include non ha funzionato
+      // o l'ID nell'HTML del modal è sbagliato.
+      console.error("ERRORE CRITICO: Elemento HTML #addModal non trovato nel DOM!");
+      alert("Errore: Impossibile trovare la struttura della finestra di dialogo (#addModal). Verifica l'inclusione del file HTML.");
+      return; // Esce dalla funzione, non si può procedere
+  }
+  console.log("Elemento HTML #addModal trovato.");
+
+  // --- 2. Esegui i Reset dei Contenuti del Modal ---
+  // Mettiamo i reset in un blocco try...catch per sicurezza,
+  // così un errore qui non impedisce necessariamente l'apertura del modal.
+  try {
+    console.log("Eseguo reset del contenuto del modal...");
+    // Resetta tutti i form all'interno del modal
+    document.querySelectorAll('#addModal form').forEach(form => {
+        if(form && typeof form.reset === 'function') {
+           form.reset();
+        }
+    });
+
+    // Richiama le funzioni di reset specifiche (se esistono)
+    if (typeof setTodaysDate === 'function') {
+        setTodaysDate(); // Imposta data odierna
+        console.log("Funzione setTodaysDate chiamata.");
+    }
+    if (typeof resetSimulatedDisplays === 'function') {
+        resetSimulatedDisplays(); // Resetta display contatori 000,000
+        console.log("Funzione resetSimulatedDisplays chiamata.");
+    }
+    // Passa l'elemento modal trovato alla funzione di reset display lettura precedente
+    if (typeof resetLastReadingDisplay === 'function') {
+        resetLastReadingDisplay(modalElement);
+        // Il log interno a resetLastReadingDisplay dirà se ha funzionato
+    }
+    if (typeof resetAddModalTabs === 'function') {
+        resetAddModalTabs(); // Resetta le tab a quella di default
+        console.log("Funzione resetAddModalTabs chiamata.");
+    }
+    // Resetta lo stato dello scanner
+    if (typeof resetScanner === 'function') {
+        resetScanner();
+        console.log("Funzione resetScanner chiamata.");
+    }
+     console.log("Reset del modal completato.");
+  } catch (resetError) {
+    // Se c'è un errore durante il reset, loggalo ma prova comunque ad aprire il modal
+    console.error("ATTENZIONE: Errore durante il reset del contenuto del modal:", resetError);
+  }
+
+  // --- 3. Mostra il Modal usando Bootstrap (con fallback) ---
+  console.log("Tentativo di mostrare il modal usando Bootstrap...");
+  try {
+      // Verifica se la libreria Bootstrap e il suo componente Modal sono caricati
+      if (typeof bootstrap === 'undefined' || !bootstrap.Modal) {
+          // Se Bootstrap non è pronto, lancia un errore per andare al blocco catch
+          throw new Error("La libreria Bootstrap.Modal non risulta caricata/disponibile.");
+      }
+
+      // Ottieni l'istanza del modal associata all'elemento HTML.
+      // getInstance restituisce l'istanza se già creata, altrimenti null.
+      let modalInstance = bootstrap.Modal.getInstance(modalElement);
+
+      // Se l'istanza non esiste ancora, creala ora.
+      if (!modalInstance) {
+          console.log("Istanza Bootstrap.Modal non trovata per #addModal. Ne creo una nuova.");
+          modalInstance = new bootstrap.Modal(modalElement, {
+              // Opzioni eventuali di Bootstrap Modal (es. focus, keyboard)
+              // backdrop: 'static', // Esempio: impedisce chiusura cliccando fuori
+              // keyboard: false    // Esempio: impedisce chiusura con ESC
+          });
+          if (!modalInstance) {
+             // Se anche la creazione fallisce...
+             throw new Error("Creazione dell'istanza Bootstrap.Modal fallita.");
+          }
+          console.log("Nuova istanza Bootstrap.Modal creata.");
+      } else {
+          console.log("Istanza Bootstrap.Modal esistente trovata per #addModal.");
+      }
+
+      // Ora che abbiamo un'istanza valida, mostra il modal.
+      modalInstance.show();
+      console.log("Metodo modalInstance.show() chiamato con successo.");
+
+  } catch (error) {
+      // Se qualcosa è andato storto con Bootstrap (non caricato, errore creazione/show)
+      console.error("ERRORE nell'apertura del modal #addModal tramite Bootstrap:", error);
+      alert("Si è verificato un errore tecnico nell'apertura della finestra di dialogo.\n Dettagli: " + error.message + "\n\nVerrà tentata un'apertura semplificata.");
+
+      // Fallback estremo: prova a mostrare l'elemento HTML manualmente.
+      // Questo potrebbe non funzionare perfettamente con l'overlay scuro di Bootstrap.
+      try {
+        modalElement.style.display = 'block';
+        modalElement.classList.add('show');
+        document.body.classList.add('modal-open'); // Aggiunge stile al body
+        console.warn("Eseguito fallback manuale per mostrare #addModal (display:block).");
+      } catch (fallbackError) {
+         console.error("ERRORE anche nel fallback manuale:", fallbackError);
+         alert("Impossibile aprire la finestra di dialogo anche con il metodo di emergenza.");
+      }
+  }
+} // --- Fine della funzione openAddModal ---
+
+    function closeAddModal() {
+       console.log("Chiusura modal aggiunta...");
+       if (addModalInstance) {
+          addModalInstance.hide();
+       } else {
+          const modalEl = document.getElementById('addModal');
+          if (modalEl) modalEl.style.display = 'none';
+       }
+       // Ferma lo scanner se attivo
+       // Verifica che la funzione esista prima di chiamarla
+       if (typeof stopScanner === 'function') {
+          stopScanner();
+       }
+    }
+
+     function openViewModal() {
+        console.log("Apertura modal visualizza...");
+        if (viewModalInstance) {
+           viewModalInstance.show();
+        } else {
+           const modalEl = document.getElementById('viewModal');
+           if (modalEl) modalEl.style.display = 'block';
+        }
+     }
+
+    function closeViewModal() {
+       console.log("Chiusura modal visualizza...");
+       if (viewModalInstance) {
+          viewModalInstance.hide();
+       } else {
+          const modalEl = document.getElementById('viewModal');
+          if (modalEl) modalEl.style.display = 'none';
+       }
+       // Resetta immagine nel view modal
+       const img = document.getElementById('view-image');
+       const imgContainer = document.getElementById('view-image-container');
+       if (img) img.src = '';
+       if (imgContainer) imgContainer.classList.add('d-none');
+    }
+
+     function resetAddModalTabs() {
+         try {
+             // Attiva tab Manuale
+             const manualTabEl = document.getElementById('manual-tab');
+             if (manualTabEl && typeof bootstrap !== 'undefined' && bootstrap.Tab) {
+                 const manualTab = bootstrap.Tab.getInstance(manualTabEl) || new bootstrap.Tab(manualTabEl);
+                 manualTab.show();
+             }
+             // Attiva tab Acqua nel sotto-gruppo
+             const acquaTabEl = document.getElementById('acqua-tab');
+             if (acquaTabEl && typeof bootstrap !== 'undefined' && bootstrap.Tab) {
+                  const acquaTab = bootstrap.Tab.getInstance(acquaTabEl) || new bootstrap.Tab(acquaTabEl);
+                 acquaTab.show();
+             }
+             activeTabForm = 'acqua'; // Resetta variabile globale
+         } catch (e) {
+             console.error("Errore durante il reset dei tab:", e);
+         }
+     }
+
+     function resetSimulatedDisplays() {
+         // Verifica che la funzione esista prima di chiamarla
+         if (typeof updateSimulatedDisplay === 'function') {
+            updateSimulatedDisplay('acqua', 0);
+            updateSimulatedDisplay('luce', 0);
+            updateSimulatedDisplay('gas', 0);
+         } else {
+            console.warn("Funzione updateSimulatedDisplay non definita per il reset.");
+         }
+     }
+
+
+    // === Azioni Utente (Salva, Visualizza, etc.) ===
+    function viewLettura(id) {
+      console.log(`Richiesta visualizzazione dettagli per ID: ${id}`);
+      const lettura = allLetture.find(l => l.id === id);
+      if (!lettura) {
+         alert("Lettura non trovata.");
+         return;
+      }
+
+      const condominio = condominiumsMap[lettura.condominioId] || { name: 'Sconosciuto' };
+      const appartamento = apartmentsMap[lettura.appartamentoId] || { number: '?', owner: 'Sconosciuto' };
+      const dataLettura = lettura.data ? new Date(lettura.data).toLocaleDateString('it-IT') : 'N/D';
+      const unit = { 'acqua': 'm³', 'luce': 'kWh', 'gas': 'm³' }[lettura.tipoContatore] || '';
+
+      // Popola il modal #viewModal (VERIFICA I TUOI ID ELEMENTO)
+      const setContent = (id, text) => {
+          const el = document.getElementById(id);
+          if(el) el.textContent = text ?? '-'; // Usa ?? per fallback a '-' se null/undefined
+          else console.warn(`Elemento #${id} non trovato nel modal visualizza`);
+      };
+
+      setContent('view-condominio', condominio.name);
+      setContent('view-appartamento', `${appartamento.number} - ${appartamento.owner}`);
+      setContent('view-data', dataLettura);
+      setContent('view-lettura', `${lettura.lettura?.toFixed(3) ?? 'N/A'} ${unit}`);
+      setContent('view-lettura-precedente', `${lettura.letturaPrecedente?.toFixed(3) ?? 'N/A'} ${unit}`);
+      setContent('view-consumo', `${lettura.consumo?.toFixed(3) ?? 'N/A'} ${unit}`);
+      setContent('view-note', lettura.note);
+
+
+       const imgContainer = document.getElementById('view-image-container');
+       const img = document.getElementById('view-image');
+       if (imgContainer && img) {
+           if (lettura.immagineUrl) {
+               img.src = lettura.immagineUrl;
+               imgContainer.classList.remove('d-none');
+           } else {
+               img.src = '';
+               imgContainer.classList.add('d-none');
+           }
+       }
+
+      openViewModal();
+    }
+
+    function saveManualReading() {
+      const activeFormId = `add-form-${activeTabForm}`;
+      const form = document.getElementById(activeFormId);
+      if (!form) {
+         alert(`Form ${activeFormId} non trovato!`);
+         return;
+      }
+
+      console.log(`Tentativo salvataggio da form: ${activeFormId}`);
+      if (!form.checkValidity()) {
+         form.reportValidity();
+         return;
+      }
+
+      const formData = {};
+      const elements = form.elements;
+      for (let i = 0; i < elements.length; i++) {
+         if (elements[i].name && elements[i].value !== undefined) { // Invia solo campi con nome e valore
+            formData[elements[i].name] = elements[i].value;
+         }
+      }
+      formData.tipoContatore = activeTabForm; // Assicura il tipo corretto
+
+      console.log("Dati da inviare (Manuale):", formData);
+      showStatusMessage("Salvataggio lettura in corso...", 'loading');
+
+      google.script.run
+        .withSuccessHandler(onSaveSuccess)
+        .withFailureHandler(onSaveFailure)
+        .addLettura(formData);
+    }
+
+    function saveScanReading() {
+        console.log("Tentativo salvataggio da scansione...");
+        // Implementa la raccolta dati dai campi dello scanner qui
+        const formData = {
+             condominioId: document.getElementById('scan-condominio')?.value,
+             appartamentoId: document.getElementById('scan-appartamento')?.value,
+             tipoContatore: document.getElementById('scan-tipo')?.value,
+             data: document.getElementById('scan-data')?.value,
+             lettura: parseFloat(document.getElementById('scan-result-value')?.textContent || 0),
+             note: document.getElementById('scan-note')?.value,
+             immagine: null // Dovresti ottenere l'immagine base64 dal canvas qui
+        };
+
+        // Validazione base (migliorabile)
+        if (!formData.condominioId || !formData.appartamentoId || !formData.tipoContatore || !formData.data) {
+             alert("Compilare tutti i campi obbligatori per la scansione.");
+             return;
+        }
+        const confirmCheckbox = document.getElementById('scan-confirm-checkbox');
+        if (!confirmCheckbox || !confirmCheckbox.checked) {
+            alert("Confermare la lettura rilevata.");
+            return;
+        }
+
+        // Ottieni immagine se presente (la tua logica qui)
+        if(typeof getScanImageBase64 === 'function') {
+            formData.immagine = getScanImageBase64();
+        }
+
+
+        console.log("Dati da inviare (Scansione):", formData);
+        showStatusMessage("Salvataggio lettura da scansione...", 'loading');
+
+        google.script.run
+          .withSuccessHandler(onSaveSuccess)
+          .withFailureHandler(onSaveFailure)
+          .addLettura(formData);
+    }
+
+    function onSaveSuccess(response) {
+       hideStatusMessage();
+       if (response && response.success) {
+          console.log("Salvataggio completato:", response);
+          closeAddModal();
+          showTemporarySuccess(response.message || "Lettura salvata con successo!");
+          loadInitialData(); // Ricarica per vedere la nuova lettura
+       } else {
+          console.error("Errore durante il salvataggio:", response);
+          // Mostra errore più specifico possibile
+          showStatusMessage("Errore salvataggio: " + (response.error || "Dettagli non disponibili."), 'error');
+          // Non chiudere il modal in caso di errore logico
+          // alert("Errore durante il salvataggio: " + (response.error || "Errore sconosciuto."));
+       }
+    }
+
+    function onSaveFailure(error) {
+       console.error("Errore comunicazione durante salvataggio:", error);
+       showStatusMessage("Errore di comunicazione con il server: " + error.message, 'error');
+       // alert("Errore di comunicazione durante il salvataggio: " + error.message);
+    }
+
+
+    // === Funzioni Scanner (Mantieni/Adatta le tue) ===
+    // Assicurati che queste funzioni esistano o commentale se non le usi ancora
+    function startScanner() { console.log("Avvio scanner..."); /* ... tua logica ... */ }
+    function captureImage() { console.log("Cattura immagine..."); /* ... tua logica ... */ }
+    function recognizeText(imageUrl) { console.log("Riconoscimento testo..."); /* ... tua logica con Tesseract ... */ }
+    function resetScanner() { console.log("Reset scanner..."); /* ... tua logica ... */ }
+    function stopScanner() { console.log("Stop scanner..."); /* ... tua logica per fermare videoStream ... */ }
+    function getScanImageBase64() { console.log("Ottenimento immagine base64..."); /* ... tua logica per prendere immagine da canvas ... */ return null; }
+
+
+    // === Funzioni Display Simulata (Mantieni/Adatta la tua) ===
+    // Assicurati che questa funzione esista o commenta le chiamate
+    function updateSimulatedDisplay(tipo, valore) {
+       console.log(`Aggiornamento display simulato ${tipo} a ${valore}`);
+       // ... la tua logica robusta per aggiornare i digit ...
+    }
+
+    // === Funzioni di Debug (Mantieni le tue) ===
+    function testDebug() {
+        console.log("Chiamata testDebug backend...");
+        showStatusMessage("Test debug backend in corso...", "loading");
+        google.script.run
+            .withSuccessHandler(r => { console.log("Risposta testDebug:", r); hideStatusMessage(); alert("Debug Backend OK: " + JSON.stringify(r)); })
+            .withFailureHandler(e => { console.error("Errore testDebug:", e); showStatusMessage("Errore Debug Backend: " + e.message, 'error'); /*alert("Errore Debug Backend: " + e.message);*/ })
+            .testDebug();
+    }
+    // Aggiungi qui le altre tue funzioni di debug (testBasicAccess, etc.)
+
+
+  </script>
+  <!-- Inclusione Script Modale (se necessario e se definito in Code.gs) -->
+  <?!= includeJsModal() ?>
+</body>
+</html>
