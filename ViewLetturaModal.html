@@ -1,0 +1,30 @@
+ <!-- Modal per visualizzare (Struttura base, mantieni la tua dettagliata) -->
+   <div class="modal fade" id="viewModal" tabindex="-1" aria-labelledby="viewModalLabel" aria-hidden="true">
+     <div class="modal-dialog modal-lg">
+       <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="viewModalLabel">Dettagli Lettura</h5>
+            <button type="button" class="btn-close" onclick="closeViewModal()"></button> <!-- Assicurati che onclick chiami la funzione giusta -->
+          </div>
+          <div class="modal-body">
+             <!-- Mantieni qui il contenuto del tuo viewModal -->
+             <!-- Assicurati che gli ID (#view-condominio, #view-appartamento, etc.) esistano -->
+             <p><strong>Condominio:</strong> <span id="view-condominio"></span></p>
+             <p><strong>Appartamento:</strong> <span id="view-appartamento"></span></p>
+             <p><strong>Data Lettura:</strong> <span id="view-data"></span></p>
+             <p><strong>Lettura Attuale:</strong> <span id="view-lettura"></span></p>
+             <p><strong>Lettura Precedente:</strong> <span id="view-lettura-precedente"></span></p>
+             <p><strong>Consumo:</strong> <span id="view-consumo"></span></p>
+             <p><strong>Note:</strong> <span id="view-note"></span></p>
+             <div id="view-image-container" class="text-center d-none mt-3">
+                <h6>Immagine Contatore</h6>
+                <img id="view-image" src="" alt="Immagine contatore" class="img-fluid rounded" style="max-height: 300px;">
+             </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closeViewModal()">Chiudi</button>
+          </div>
+       </div>
+     </div>
+   </div>
+   <!-- Fine Modali -->
